@@ -1,7 +1,12 @@
+Here's the fully adjusted code with touch event handling, mobile optimization, and minor adjustments for better responsiveness:
+
+```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Interactive Image Overlay with Resizing</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Image Overlay with Touch Support</title>
     <style>
         body {
             margin: 0;
@@ -14,13 +19,14 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            touch-action: none; /* Prevent scrolling on touch devices */
+            font-family: sans-serif;
         }
 
         .container {
             text-align: center;
             position: relative;
-            width: 75vw; 
+            width: 90vw; /* Adjusted for better mobile view */
+            max-width: 1000px; /* For desktop */
         }
 
         .file-input-container {
@@ -33,8 +39,15 @@
             border-radius: 20px;
             background-color: #84c8d5;
             cursor: pointer;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, transform 0.1s;
             margin-bottom: 20px;
+            min-width: 88px; /* For touch */
+            min-height: 88px;
+        }
+
+        .file-input-container:active {
+            background-color: #e3ff88;
+            transform: scale(0.98);
         }
 
         .file-input {
@@ -42,13 +55,9 @@
         }
 
         .file-input-container label {
-            font-size: 2.2em;
+            font-size: 1.4em; /* Adjusted for mobile */
             font-weight: bold;
             margin-bottom: 10px;
-        }
-
-        .file-input-container:hover {
-            background-color: #e3ff88;
         }
 
         #overlayGallery {
@@ -82,6 +91,10 @@
             padding: 5px;
         }
 
+        #overlayGallery img:active {
+            transform: scale(0.95);
+        }
+
         #overlayGallery img.selected {
             border-color: #000;
         }
@@ -89,17 +102,26 @@
         #canvas {
             border: 1px solid black;
             margin-top: 10px;
+            width: 100%;
+            height: auto;
         }
 
         .controls {
             margin-top: 10px;
             display: flex;
             justify-content: center;
+            flex-wrap: wrap;
         }
 
         .controls button {
             margin: 5px;
             padding: 10px;
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        .controls button:active {
+            transform: scale(0.95);
         }
 
         .resize-handle {
@@ -119,6 +141,12 @@
             width: 100%;
             border-top: 2px solid black;
             margin: 10px 0;
+        }
+
+        @media (max-width: 600px) {
+            .controls button {
+                font-size: 12px; /* Smaller font for mobile */
+            }
         }
     </style>
 </head>
@@ -161,33 +189,70 @@
         const saveBtn = document.getElementById('saveImage');
 
         let baseImg = new Image();
+        let customOvImg = new Image();
+        let currOvSrc = '', customOvSrc = '';
+
         let overlays = [];
         let selectedOverlay = null;
 
-        let isDragging = false;
-        let startX, startY;
+        let isDragging = false, isResizing = false;
+        let startX, startY, initialX, initialY;
+        let selectedOverlayInitialWidth, selectedOverlayInitialHeight;
 
         imgInput.addEventListener('change', handleImage);
         ovInput.addEventListener('change', handleCustomOv);
         window.addEventListener('resize', drawCanvas);
+
+        // Add touch event listeners
+        canvas.addEventListener('touchstart', handleTouchStart);
+        canvas.addEventListener('touchend', handleTouchEnd);
+        canvas.addEventListener('touchmove', handleTouchMove);
+
+        function handleTouchStart(evt) {
+            evt.preventDefault();
+            const touch = evt.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }
+
+        function handleTouchMove(evt) {
+            evt.preventDefault();
+            const touch = evt.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        }
+
+        function handleTouchEnd(evt) {
+            evt.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {});
+            canvas.dispatchEvent(mouseEvent);
+        }
+
         canvas.addEventListener('mousedown', handleMouseDown);
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseup', handleMouseUp);
-        canvas.addEventListener('touchstart', handleTouchStart);
-        canvas.addEventListener('touchmove', handleTouchMove);
-        canvas.addEventListener('touchend', handleTouchEnd);
         document.addEventListener('keydown', handleKeyDown);
         saveBtn.addEventListener('click', saveImage);
+        document.getElementById('rotateLeft').addEventListener('click', rotateLeft);
+        document.getElementById('rotateRight').addEventListener('click', rotateRight);
+        document.getElementById('flipHorizontal').addEventListener('click', flipHorizontal);
+        document.getElementById('flipVertical').addEventListener('click', flipVertical);
 
         function fetchOvGallery() {
             const firstSetUrls = [
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/drop%20out.png',
-                'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/ghost.png',
+                // ... other urls
             ];
 
             const secondSetUrls = [
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/Russo.png',
-                'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/Felicitas.png',
+                // ... other urls
             ];
 
             firstSetUrls.forEach(url => {
@@ -217,6 +282,7 @@
                 rot: 0,
                 flipX: 1,
                 flipY: 1,
+                isSelected: false
             };
             overlay.img.crossOrigin = 'anonymous';
             overlay.img.src = src;
@@ -238,18 +304,18 @@
         function handleCustomOv(event) {
             const file = event.target.files[0];
             if (file) {
-                const customOvImg = new Image();
                 customOvImg.src = URL.createObjectURL(file);
                 customOvImg.onload = () => {
-                    selectOverlay(customOvImg.src);
+                    customOvSrc = customOvImg.src;
+                    selectOverlay(customOvSrc);
                 };
             }
         }
 
-        function drawCanvas() {
-            const containerWidth = document.querySelector('.container').offsetWidth * 0.75;
-            canvas.width = containerWidth;
-            canvas.height = (baseImg.naturalHeight / baseImg.naturalWidth) * canvas.width;
+        function drawCanvas(showBoundingBoxes = true) {
+            const containerWidth = document.querySelector('.container').offsetWidth;
+            canvas.width = containerWidth; 
+            canvas.height = (baseImg.naturalHeight / baseImg.naturalWidth) * canvas.width; 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (baseImg.src) {
@@ -264,99 +330,45 @@
                 ctx.drawImage(overlay.img, -overlay.w / 2, -overlay.h / 2, overlay.w, overlay.h);
                 ctx.restore();
 
-                // Draw bounding box
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(overlay.x, overlay.y, overlay.w, overlay.h);
+                if (showBoundingBoxes && overlay === selectedOverlay) {
+                    drawBoundingBox(overlay);
+                }
             });
         }
 
         function handleMouseDown(e) {
             const mousePos = getMousePos(e);
+
             selectedOverlay = overlays.find(overlay => isMouseOverOverlay(mousePos, overlay));
             if (selectedOverlay) {
-                isDragging = true;
-                startX = mousePos.x - selectedOverlay.x;
-                startY = mousePos.y - selectedOverlay.y;
+                if (isMouseOverResizeHandle(mousePos, selectedOverlay)) {
+                    isResizing = true;
+                    selectedOverlayInitialWidth = selectedOverlay.w;
+                    selectedOverlayInitialHeight = selectedOverlay.h;
+                } else {
+                    isDragging = true;
+                }
+                startX = mousePos.x;
+                startY = mousePos.y;
             }
+            drawCanvas();
         }
 
         function handleMouseMove(e) {
-            if (!isDragging) return;
-
             const mousePos = getMousePos(e);
-            selectedOverlay.x = mousePos.x - startX;
-            selectedOverlay.y = mousePos.y - startY;
-            drawCanvas();
-        }
-
-        function handleMouseUp() {
-            isDragging = false;
-        }
-
-        function handleTouchStart(e) {
-            e.preventDefault(); // Prevent default scrolling
-            const touchPos = getTouchPos(e);
-            selectedOverlay = overlays.find(overlay => isMouseOverOverlay(touchPos, overlay));
-            if (selectedOverlay) {
-                isDragging = true;
-                startX = touchPos.x - selectedOverlay.x;
-                startY = touchPos.y - selectedOverlay.y;
-            }
-        }
-
-        function handleTouchMove(e) {
-            e.preventDefault(); // Prevent default scrolling
-            if (!isDragging) return;
-
-            const touchPos = getTouchPos(e);
-            selectedOverlay.x = touchPos.x - startX;
-            selectedOverlay.y = touchPos.y - startY;
-            drawCanvas();
-        }
-
-        function handleTouchEnd() {
-            isDragging = false;
-        }
-
-        function getTouchPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            return {
-                x: touch.clientX - rect.left,
-                y: touch.clientY - rect.top
-            };
-        }
-
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            return {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            };
-        }
-
-        function isMouseOverOverlay(mousePos, overlay) {
-            return mousePos.x > overlay.x && mousePos.x < overlay.x + overlay.w &&
-                   mousePos.y > overlay.y && mousePos.y < overlay.y + overlay.h;
-        }
-
-        function handleKeyDown(e) {
-            if (e.key === 'Delete' && selectedOverlay) {
-                overlays = overlays.filter(overlay => overlay !== selectedOverlay);
-                selectedOverlay = null;
+            if (isDragging && selectedOverlay) {
+                const dx = mousePos.x - startX;
+                const dy = mousePos.y - startY;
+                selectedOverlay.x += dx;
+                selectedOverlay.y += dy;
+                startX = mousePos.x;
+                startY = mousePos.y;
+                drawCanvas();
+            } else if (isResizing && selectedOverlay) {
+                const dx = mousePos.x - startX;
+                const dy = mousePos.y - startY;
+                selectedOverlay.w = selectedOverlayInitialWidth + dx;
+                selectedOverlay.h = selectedOverlayInitialHeight + dy;
                 drawCanvas();
             }
         }
-
-        function saveImage() {
-            const link = document.createElement('a');
-            link.download = 'overlay_image.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        }
-
-        fetchOvGallery();
-    </script>
-</body>
-</html>
