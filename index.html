@@ -160,15 +160,11 @@
         const saveBtn = document.getElementById('saveImage');
 
         let baseImg = new Image();
-        let customOvImg = new Image();
-        let currOvSrc = '', customOvSrc = '';
-
         let overlays = [];
         let selectedOverlay = null;
 
-        let isDragging = false, isResizing = false;
-        let startX, startY, initialX, initialY;
-        let selectedOverlayInitialWidth, selectedOverlayInitialHeight;
+        let isDragging = false;
+        let startX, startY;
 
         imgInput.addEventListener('change', handleImage);
         ovInput.addEventListener('change', handleCustomOv);
@@ -181,22 +177,16 @@
         canvas.addEventListener('touchend', handleTouchEnd);
         document.addEventListener('keydown', handleKeyDown);
         saveBtn.addEventListener('click', saveImage);
-        document.getElementById('rotateLeft').addEventListener('click', rotateLeft);
-        document.getElementById('rotateRight').addEventListener('click', rotateRight);
-        document.getElementById('flipHorizontal').addEventListener('click', flipHorizontal);
-        document.getElementById('flipVertical').addEventListener('click', flipVertical);
 
         function fetchOvGallery() {
             const firstSetUrls = [
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/drop%20out.png',
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/ghost.png',
-                // Add other URLs as needed
             ];
 
             const secondSetUrls = [
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/Russo.png',
                 'https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/Felicitas.png',
-                // Add other URLs as needed
             ];
 
             firstSetUrls.forEach(url => {
@@ -226,7 +216,6 @@
                 rot: 0,
                 flipX: 1,
                 flipY: 1,
-                isSelected: false
             };
             overlay.img.crossOrigin = 'anonymous';
             overlay.img.src = src;
@@ -248,18 +237,18 @@
         function handleCustomOv(event) {
             const file = event.target.files[0];
             if (file) {
+                const customOvImg = new Image();
                 customOvImg.src = URL.createObjectURL(file);
                 customOvImg.onload = () => {
-                    customOvSrc = customOvImg.src;
-                    selectOverlay(customOvSrc);
+                    selectOverlay(customOvImg.src);
                 };
             }
         }
 
-        function drawCanvas(showBoundingBoxes = true) {
+        function drawCanvas() {
             const containerWidth = document.querySelector('.container').offsetWidth * 0.75;
-            canvas.width = containerWidth; 
-            canvas.height = (baseImg.naturalHeight / baseImg.naturalWidth) * canvas.width; 
+            canvas.width = containerWidth;
+            canvas.height = (baseImg.naturalHeight / baseImg.naturalWidth) * canvas.width;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (baseImg.src) {
@@ -273,65 +262,53 @@
                 ctx.scale(overlay.flipX, overlay.flipY);
                 ctx.drawImage(overlay.img, -overlay.w / 2, -overlay.h / 2, overlay.w, overlay.h);
                 ctx.restore();
-
-                if (showBoundingBoxes && overlay === selectedOverlay) {
-                    drawBoundingBox(overlay);
-                }
             });
         }
 
         function handleMouseDown(e) {
             const mousePos = getMousePos(e);
-
-            // Select an overlay by clicking on it
             selectedOverlay = overlays.find(overlay => isMouseOverOverlay(mousePos, overlay));
             if (selectedOverlay) {
-                if (isMouseOverResizeHandle(mousePos, selectedOverlay)) {
-                    isResizing = true;
-                    selectedOverlayInitialWidth = selectedOverlay.w;
-                    selectedOverlayInitialHeight = selectedOverlay.h;
-                } else {
-                    isDragging = true;
-                    startX = mousePos.x - selectedOverlay.x;
-                    startY = mousePos.y - selectedOverlay.y;
-                }
+                isDragging = true;
+                startX = mousePos.x - selectedOverlay.x;
+                startY = mousePos.y - selectedOverlay.y;
             }
         }
 
         function handleMouseMove(e) {
+            if (!isDragging) return;
+
             const mousePos = getMousePos(e);
-            if (isDragging && selectedOverlay) {
-                selectedOverlay.x = mousePos.x - startX;
-                selectedOverlay.y = mousePos.y - startY;
-                drawCanvas();
-            } else if (isResizing && selectedOverlay) {
-                const newWidth = selectedOverlayInitialWidth + (mousePos.x - (selectedOverlay.x + selectedOverlay.w / 2));
-                const newHeight = selectedOverlayInitialHeight + (mousePos.y - (selectedOverlay.y + selectedOverlay.h / 2));
-                if (newWidth > 0) selectedOverlay.w = newWidth;
-                if (newHeight > 0) selectedOverlay.h = newHeight;
-                drawCanvas();
-            }
+            selectedOverlay.x = mousePos.x - startX;
+            selectedOverlay.y = mousePos.y - startY;
+            drawCanvas();
         }
 
         function handleMouseUp() {
             isDragging = false;
-            isResizing = false;
         }
 
         function handleTouchStart(e) {
-            e.preventDefault();
             const touchPos = getTouchPos(e);
-            handleMouseDown({ clientX: touchPos.x, clientY: touchPos.y });
+            selectedOverlay = overlays.find(overlay => isMouseOverOverlay(touchPos, overlay));
+            if (selectedOverlay) {
+                isDragging = true;
+                startX = touchPos.x - selectedOverlay.x;
+                startY = touchPos.y - selectedOverlay.y;
+            }
         }
 
         function handleTouchMove(e) {
-            e.preventDefault();
+            if (!isDragging) return;
+
             const touchPos = getTouchPos(e);
-            handleMouseMove({ clientX: touchPos.x, clientY: touchPos.y });
+            selectedOverlay.x = touchPos.x - startX;
+            selectedOverlay.y = touchPos.y - startY;
+            drawCanvas();
         }
 
         function handleTouchEnd() {
-            handleMouseUp();
+            isDragging = false;
         }
 
         function getTouchPos(e) {
@@ -354,50 +331,6 @@
         function isMouseOverOverlay(mousePos, overlay) {
             return mousePos.x > overlay.x && mousePos.x < overlay.x + overlay.w &&
                    mousePos.y > overlay.y && mousePos.y < overlay.y + overlay.h;
-        }
-
-        function isMouseOverResizeHandle(mousePos, overlay) {
-            const handleSize = 10; // Resize handle size
-            return mousePos.x > overlay.x + overlay.w - handleSize &&
-                   mousePos.x < overlay.x + overlay.w &&
-                   mousePos.y > overlay.y + overlay.h - handleSize &&
-                   mousePos.y < overlay.y + overlay.h;
-        }
-
-        function drawBoundingBox(overlay) {
-            const handleSize = 10;
-            ctx.strokeStyle = 'red';
-            ctx.strokeRect(overlay.x, overlay.y, overlay.w, overlay.h);
-            ctx.fillStyle = 'red';
-            ctx.fillRect(overlay.x + overlay.w - handleSize, overlay.y + overlay.h - handleSize, handleSize, handleSize);
-        }
-
-        function rotateLeft() {
-            if (selectedOverlay) {
-                selectedOverlay.rot -= 10;
-                drawCanvas();
-            }
-        }
-
-        function rotateRight() {
-            if (selectedOverlay) {
-                selectedOverlay.rot += 10;
-                drawCanvas();
-            }
-        }
-
-        function flipHorizontal() {
-            if (selectedOverlay) {
-                selectedOverlay.flipX *= -1;
-                drawCanvas();
-            }
-        }
-
-        function flipVertical() {
-            if (selectedOverlay) {
-                selectedOverlay.flipY *= -1;
-                drawCanvas();
-            }
         }
 
         function handleKeyDown(e) {
