@@ -14,6 +14,7 @@
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
+            touch-action: none; /* Prevent scrolling on touch devices */
         }
 
         .container {
@@ -262,6 +263,11 @@
                 ctx.scale(overlay.flipX, overlay.flipY);
                 ctx.drawImage(overlay.img, -overlay.w / 2, -overlay.h / 2, overlay.w, overlay.h);
                 ctx.restore();
+
+                // Draw bounding box
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(overlay.x, overlay.y, overlay.w, overlay.h);
             });
         }
 
@@ -289,6 +295,7 @@
         }
 
         function handleTouchStart(e) {
+            e.preventDefault(); // Prevent default scrolling
             const touchPos = getTouchPos(e);
             selectedOverlay = overlays.find(overlay => isMouseOverOverlay(touchPos, overlay));
             if (selectedOverlay) {
@@ -299,6 +306,7 @@
         }
 
         function handleTouchMove(e) {
+            e.preventDefault(); // Prevent default scrolling
             if (!isDragging) return;
 
             const touchPos = getTouchPos(e);
