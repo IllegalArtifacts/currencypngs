@@ -8,19 +8,19 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             min-height: 100vh;
             background-image: url('https://raw.githubusercontent.com/IllegalArtifacts/Blume/main/GTCMHZSW8AAcKWE.jfif');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            touch-action: none; /* Prevent scrolling on touch devices */
         }
 
         .container {
             text-align: center;
             position: relative;
             width: 75vw; 
+            overflow-y: auto; /* Enable scrolling */
         }
 
         .file-input-container {
@@ -90,8 +90,9 @@
             border: 1px solid black;
             margin-top: 10px;
             width: 100%; /* Set width to 100% */
-            height: auto; /* Set height to auto to maintain aspect ratio */
+            height: auto; /* Maintain aspect ratio */
             max-width: 75vw; /* Ensure it does not exceed the container width */
+            display: block; /* Prevents inline spacing issues */
         }
 
         .controls {
